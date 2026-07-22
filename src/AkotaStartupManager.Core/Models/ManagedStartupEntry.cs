@@ -19,6 +19,23 @@ public sealed class ManagedStartupEntry
     public string? OriginalStartupItemId { get; set; }
 
     public string ProcessName => Path.GetFileNameWithoutExtension(ExecutablePath);
+
+    public ManagedStartupEntry DeepClone() => new()
+    {
+        Id = Id,
+        Name = Name,
+        ExecutablePath = ExecutablePath,
+        Arguments = Arguments,
+        WorkingDirectory = WorkingDirectory,
+        IsEnabled = IsEnabled,
+        Conditions = (ConditionGroup)Conditions.DeepClone(),
+        PollIntervalSeconds = PollIntervalSeconds,
+        RequiredConsecutiveSuccesses = RequiredConsecutiveSuccesses,
+        DelayAfterReadySeconds = DelayAfterReadySeconds,
+        StartupVerificationSeconds = StartupVerificationSeconds,
+        MaxRetries = MaxRetries,
+        OriginalStartupItemId = OriginalStartupItemId
+    };
 }
 
 public sealed class ApplicationConfiguration

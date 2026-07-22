@@ -11,12 +11,18 @@ public partial class ManagedEntryEditorWindow : Window
     private StartupCondition? _selectedCondition;
     private bool _updatingFields;
 
-    public ManagedEntryEditorWindow(ManagedStartupEntry entry)
+    public ManagedEntryEditorWindow(ManagedStartupEntry entry, bool isEditing = false)
     {
         InitializeComponent();
         _entry = entry;
         DataContext = entry;
         ConditionTree.ItemsSource = new[] { entry.Conditions };
+        if (isEditing)
+        {
+            Title = "编辑已有接管规则";
+            EditorHeading.Text = "编辑接管启动规则";
+            EditorDescription.Text = "修改将仅在保存成功后生效；取消不会改变现有规则。";
+        }
     }
 
     private ConditionGroup SelectedGroup =>

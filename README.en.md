@@ -4,6 +4,9 @@
 
 <h1 align="center">Akota Startup Manager</h1>
 
+> [!NOTE]
+> This project's code, interface, and documentation are written entirely by AI, with requirements, review, and releases directed by the project maintainer.
+
 <p align="center">
   Reliable, recoverable, and dependency-aware Windows startup management.
 </p>
@@ -15,7 +18,7 @@
 </p>
 
 > [!IMPORTANT]
-> This project is currently at the early `0.1.1` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
+> This project is currently at the early `0.1.2` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
 
 ## Why use it?
 
@@ -32,6 +35,7 @@ Native Windows startup settings can only say “start after sign-in.” They can
 - Manage Windows scheduled tasks with boot or logon triggers
 - Preserve recoverable backups when disabling native startup entries
 - Convert a native startup item directly into a managed rule
+- Edit existing managed rules from the toolbar or by double-clicking a row; cancelling leaves the saved rule unchanged
 - Build nested AND / OR condition trees with:
   - **Process** — a process exists
   - **TcpPort** — a local TCP endpoint accepts connections
@@ -59,7 +63,7 @@ Native Windows startup settings can only say “start after sign-in.” They can
 2. Verify the SHA-256 value using the matching `.zip.sha256` file, then extract the ZIP to a user-writable directory.
 3. Run `AkotaStartupManager.exe`.
 4. Use **Windows Startup** to disable, restore, or take over an entry.
-5. Use **Managed Startup** to configure the target, stability policy, and dependencies.
+5. Use **Managed Startup** to configure the target, stability policy, and dependencies. Select a rule and click **Edit Rule**, or double-click its row, to modify it later.
 
 > [!WARNING]
 > Do not place the portable build under `Program Files` or another location that normal users cannot write to. Machine-wide operations can trigger UAC. Do not disable system or security tasks unless you understand their purpose.

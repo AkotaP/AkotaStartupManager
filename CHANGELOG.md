@@ -10,6 +10,17 @@
 
 - 持续改进可访问性、条件测试体验与 Windows 集成测试。
 
+## [0.1.2] - 2026-07-22
+
+### Added
+
+- 支持通过“编辑规则”按钮或双击规则行修改已有接管规则。
+- 中英文 README 增加项目完全由 AI 编写的说明。
+
+### Changed
+
+- 规则编辑采用深复制的事务式流程，取消或保存失败时不会污染原规则及当前监控配置。
+
 ## [0.1.1] - 2026-07-22
 
 ### Fixed
@@ -38,6 +49,7 @@
 - `win-x64` 自包含便携发布脚本和 SHA-256 产物。
 - 中英文项目文档、GPL-3.0 许可证与 GitHub 社区模板。
 
-[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AkotaP/AkotaStartupManager/releases/tag/v0.1.0

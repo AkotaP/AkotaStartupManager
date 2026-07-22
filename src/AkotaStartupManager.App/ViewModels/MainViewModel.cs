@@ -50,6 +50,7 @@ public sealed class MainViewModel : ObservableObject
         TakeOverCommand = new AsyncCommand(TakeOverSelectedAsync, () => SelectedStartupItem is not null && !IsBusy);
         RestoreCommand = new AsyncCommand(RestoreLastAsync, () => Backups.Count > 0 && !IsBusy);
         AddManagedCommand = new AsyncCommand(AddManagedAsync, () => !IsBusy);
+        EditManagedCommand = new AsyncCommand(EditManagedAsync, () => SelectedManagedEntry is not null && !IsBusy);
         RemoveManagedCommand = new AsyncCommand(RemoveManagedAsync, () => SelectedManagedEntry is not null && !IsBusy);
         LaunchNowCommand = new AsyncCommand(LaunchSelectedNowAsync, () => SelectedManagedEntry is not null && !IsBusy);
         RestartMonitoringCommand = new AsyncCommand(RestartMonitoringAsync, () => !IsBusy);
@@ -70,6 +71,7 @@ public sealed class MainViewModel : ObservableObject
     public AsyncCommand TakeOverCommand { get; }
     public AsyncCommand RestoreCommand { get; }
     public AsyncCommand AddManagedCommand { get; }
+    public AsyncCommand EditManagedCommand { get; }
     public AsyncCommand RemoveManagedCommand { get; }
     public AsyncCommand LaunchNowCommand { get; }
     public AsyncCommand RestartMonitoringCommand { get; }
@@ -102,6 +104,7 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _selectedManagedEntry, value)) return;
+            EditManagedCommand.NotifyCanExecuteChanged();
             RemoveManagedCommand.NotifyCanExecuteChanged();
             LaunchNowCommand.NotifyCanExecuteChanged();
         }
@@ -269,6 +272,32 @@ public sealed class MainViewModel : ObservableObject
         }, "保存接管规则失败");
     }
 
+    private async Task EditManagedAsync()
+    {
+        if (SelectedManagedEntry is null) return;
+        var selectedId = SelectedManagedEntry.Id;
+        var editedEntry = SelectedManagedEntry.DeepClone();
+        var editor = new global::AkotaStartupManager.App.ManagedEntryEditorWindow(editedEntry, isEditing: true)
+        {
+            Owner = WpfApplication.Current.MainWindow
+        };
+        if (editor.ShowDialog() != true) return;
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var configuration = await _repository.LoadAsync();
+            var index = configuration.Entries.FindIndex(x => x.Id == selectedId);
+            if (index < 0)
+                throw new InvalidOperationException("要编辑的接管规则已不存在，请刷新后重试。");
+            configuration.Entries[index] = editedEntry;
+            await _repository.SaveAsync(configuration);
+            await ReloadConfigurationAsync();
+            SelectedManagedEntry = ManagedEntries.FirstOrDefault(x => x.Id == selectedId);
+            await _orchestrator.StartAsync(ManagedEntries);
+            StatusText = $"已保存规则“{editedEntry.Name}”";
+        }, "保存接管规则失败");
+    }
+
     private async Task RemoveManagedAsync()
     {
         if (SelectedManagedEntry is null) return;
@@ -313,6 +342,7 @@ public sealed class MainViewModel : ObservableObject
         TakeOverCommand.NotifyCanExecuteChanged();
         RestoreCommand.NotifyCanExecuteChanged();
         AddManagedCommand.NotifyCanExecuteChanged();
+        EditManagedCommand.NotifyCanExecuteChanged();
         RemoveManagedCommand.NotifyCanExecuteChanged();
         LaunchNowCommand.NotifyCanExecuteChanged();
         RestartMonitoringCommand.NotifyCanExecuteChanged();

@@ -53,6 +53,7 @@ public sealed class ConditionEvaluatorTests
     private sealed class TestCondition : StartupCondition
     {
         public override string DisplayName => "测试";
+        public override StartupCondition DeepClone() => new TestCondition { Id = Id, IsEnabled = IsEnabled };
     }
 
     private sealed class QueueChecker(params bool[] values) : IConditionChecker
