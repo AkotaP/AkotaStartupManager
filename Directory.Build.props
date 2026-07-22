@@ -5,5 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <VersionFile>$(MSBuildThisFileDirectory)VERSION</VersionFile>
+    <VersionSpecifiedExternally Condition="'$(Version)' != ''">true</VersionSpecifiedExternally>
+    <VersionSpecifiedExternally Condition="'$(VersionSpecifiedExternally)' == ''">false</VersionSpecifiedExternally>
+    <Version Condition="'$(Version)' == '' and Exists('$(VersionFile)')">$([System.IO.File]::ReadAllText('$(VersionFile)').Trim())</Version>
+    <VersionCore>$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^\d+\.\d+\.\d+').Value)</VersionCore>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(VersionCore).0</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == ''">$(VersionCore).0</FileVersion>
+    <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
   </PropertyGroup>
 </Project>

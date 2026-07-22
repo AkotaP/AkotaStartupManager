@@ -15,7 +15,7 @@
 </p>
 
 > [!IMPORTANT]
-> 当前项目处于 `0.1.0` 早期版本。修改系统级注册表项、公共启动文件夹或计划任务前，请确认已理解操作影响并保留重要配置备份。
+> 当前项目处于 `0.1.1` 早期版本。修改系统级注册表项、公共启动文件夹或计划任务前，请确认已理解操作影响并保留重要配置备份。
 
 ## 为什么使用它？
 
@@ -47,13 +47,16 @@ Windows 原生自启动只能决定“登录后启动”，无法表达“数据
 ## 系统要求
 
 - Windows 10/11 x64
-- 使用预编译自包含发行版时，无需预装 .NET
+- 使用预编译的 **standalone** 包时，无需预装 .NET
+- 使用体积更小的 **runtime** 包时，需要预装 [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 - 从源码构建需要 [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 ## 快速开始
 
-1. 前往 [Releases](https://github.com/AkotaP/AkotaStartupManager/releases) 下载 `AkotaStartupManager-v*-win-x64.zip`。
-2. 校验随附的 SHA-256 文件，然后将 ZIP 解压到普通用户可写目录。
+1. 前往 [Releases](https://github.com/AkotaP/AkotaStartupManager/releases)，按需要下载：
+   - `AkotaStartupManager-v*-win-x64-standalone.zip`：自包含运行时，下载后即可使用。
+   - `AkotaStartupManager-v*-win-x64-runtime.zip`：包体积更小，需要预装 .NET 10 Desktop Runtime。
+2. 使用同名 `.zip.sha256` 文件校验 SHA-256，然后将 ZIP 解压到普通用户可写目录。
 3. 运行 `AkotaStartupManager.exe`。
 4. 在“Windows 启动项”中选择项目进行禁用、恢复或接管。
 5. 在“接管启动”中配置目标程序、稳定性参数和依赖条件。
@@ -102,10 +105,16 @@ dotnet build .\AkotaStartupManager.slnx -c Release
 dotnet test .\AkotaStartupManager.slnx -c Release --no-build
 ```
 
-生成可上传 GitHub Release 的便携 ZIP 和 SHA-256 文件：
+生成可上传 GitHub Release 的两种便携 ZIP（standalone 与 runtime）及各自 SHA-256 文件。版本号默认从仓库根目录的 `VERSION` 读取：
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.1.0
+.\scripts\publish.ps1
+```
+
+需要临时覆盖版本号（不会修改 `VERSION`）时，可使用 `-Version`：
+
+```powershell
+.\scripts\publish.ps1 -Version 0.1.1-beta.1
 ```
 
 产物位于 `artifacts\`。完整发布方式见 [贡献指南](CONTRIBUTING.md#发布版本)。

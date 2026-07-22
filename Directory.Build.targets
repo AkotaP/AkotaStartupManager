@@ -1,8 +1,8 @@
 <Project>
-  <PropertyGroup>
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
-    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(Version).0</AssemblyVersion>
-    <FileVersion Condition="'$(FileVersion)' == ''">$(Version).0</FileVersion>
-    <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
-  </PropertyGroup>
+  <Target Name="ValidateVersion" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(VersionSpecifiedExternally)' != 'true' and !Exists('$(VersionFile)')"
+           Text="Version file was not found: $(VersionFile)" />
+    <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(Version)', '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$')) != 'True'"
+           Text="Invalid semantic version '$(Version)'. Update $(VersionFile) or pass a valid Version property." />
+  </Target>
 </Project>

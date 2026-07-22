@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using WpfApplication = System.Windows.Application;
-using Microsoft.Win32;
 using AkotaStartupManager.Application.Services;
 using AkotaStartupManager.Core.Interfaces;
 using AkotaStartupManager.Core.Models;
@@ -55,6 +54,7 @@ public sealed class MainViewModel : ObservableObject
         LaunchNowCommand = new AsyncCommand(LaunchSelectedNowAsync, () => SelectedManagedEntry is not null && !IsBusy);
         RestartMonitoringCommand = new AsyncCommand(RestartMonitoringAsync, () => !IsBusy);
         OpenLogsCommand = new RelayCommand(OpenLogs);
+        Backups.CollectionChanged += (_, _) => RestoreCommand.NotifyCanExecuteChanged();
         logger.MessageWritten += (_, line) => WpfApplication.Current.Dispatcher.Invoke(() => LogLines.Insert(0, line));
         _orchestrator.StateChanged += (_, state) => WpfApplication.Current.Dispatcher.Invoke(() => UpdateRuntimeState(state));
     }
@@ -76,11 +76,36 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand OpenLogsCommand { get; }
 
     public int SelectedPage { get => _selectedPage; set => SetProperty(ref _selectedPage, value); }
-    public bool IsBusy { get => _isBusy; private set => SetProperty(ref _isBusy, value); }
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set
+        {
+            if (SetProperty(ref _isBusy, value)) NotifyBusyCommandsCanExecuteChanged();
+        }
+    }
     public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
     public string SearchText { get => _searchText; set { if (SetProperty(ref _searchText, value)) ApplyFilter(); } }
-    public StartupItem? SelectedStartupItem { get => _selectedStartupItem; set { SetProperty(ref _selectedStartupItem, value); } }
-    public ManagedStartupEntry? SelectedManagedEntry { get => _selectedManagedEntry; set => SetProperty(ref _selectedManagedEntry, value); }
+    public StartupItem? SelectedStartupItem
+    {
+        get => _selectedStartupItem;
+        set
+        {
+            if (!SetProperty(ref _selectedStartupItem, value)) return;
+            DisableCommand.NotifyCanExecuteChanged();
+            TakeOverCommand.NotifyCanExecuteChanged();
+        }
+    }
+    public ManagedStartupEntry? SelectedManagedEntry
+    {
+        get => _selectedManagedEntry;
+        set
+        {
+            if (!SetProperty(ref _selectedManagedEntry, value)) return;
+            RemoveManagedCommand.NotifyCanExecuteChanged();
+            LaunchNowCommand.NotifyCanExecuteChanged();
+        }
+    }
     public bool StartWithWindows { get => _selfStartup.IsEnabled; set { _selfStartup.SetEnabled(value); OnPropertyChanged(); } }
     public int StartupItemCount => StartupItems.Count;
     public int ManagedCount => ManagedEntries.Count;
@@ -279,6 +304,18 @@ public sealed class MainViewModel : ObservableObject
         foreach (var entry in configuration.Entries) ManagedEntries.Add(entry);
         foreach (var backup in configuration.Backups) Backups.Add(backup);
         OnPropertyChanged(nameof(ManagedCount));
+    }
+
+    private void NotifyBusyCommandsCanExecuteChanged()
+    {
+        RefreshCommand.NotifyCanExecuteChanged();
+        DisableCommand.NotifyCanExecuteChanged();
+        TakeOverCommand.NotifyCanExecuteChanged();
+        RestoreCommand.NotifyCanExecuteChanged();
+        AddManagedCommand.NotifyCanExecuteChanged();
+        RemoveManagedCommand.NotifyCanExecuteChanged();
+        LaunchNowCommand.NotifyCanExecuteChanged();
+        RestartMonitoringCommand.NotifyCanExecuteChanged();
     }
 
     private async Task ExecuteBusyAsync(Func<Task> action, string errorTitle)

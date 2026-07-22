@@ -15,7 +15,7 @@
 </p>
 
 > [!IMPORTANT]
-> This project is currently at the early `0.1.0` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
+> This project is currently at the early `0.1.1` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
 
 ## Why use it?
 
@@ -47,13 +47,16 @@ Native Windows startup settings can only say “start after sign-in.” They can
 ## Requirements
 
 - Windows 10/11 x64
-- Prebuilt self-contained releases do not require a separately installed .NET runtime
+- Prebuilt **standalone** packages do not require a separately installed .NET runtime
+- Smaller **runtime** packages require the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Building from source requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 ## Quick start
 
-1. Download `AkotaStartupManager-v*-win-x64.zip` from [Releases](https://github.com/AkotaP/AkotaStartupManager/releases).
-2. Verify the included SHA-256 checksum, then extract the ZIP to a user-writable directory.
+1. Open [Releases](https://github.com/AkotaP/AkotaStartupManager/releases) and choose:
+   - `AkotaStartupManager-v*-win-x64-standalone.zip` — includes the runtime and is ready to run after extraction.
+   - `AkotaStartupManager-v*-win-x64-runtime.zip` — smaller download that requires the .NET 10 Desktop Runtime.
+2. Verify the SHA-256 value using the matching `.zip.sha256` file, then extract the ZIP to a user-writable directory.
 3. Run `AkotaStartupManager.exe`.
 4. Use **Windows Startup** to disable, restore, or take over an entry.
 5. Use **Managed Startup** to configure the target, stability policy, and dependencies.
@@ -102,10 +105,16 @@ dotnet build .\AkotaStartupManager.slnx -c Release
 dotnet test .\AkotaStartupManager.slnx -c Release --no-build
 ```
 
-Create a portable GitHub Release ZIP and SHA-256 checksum:
+Create both portable GitHub Release packages (standalone and runtime) with their SHA-256 checksum files. The version is read from the repository's root `VERSION` file by default:
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.1.0
+.\scripts\publish.ps1
+```
+
+Use `-Version` for a temporary override without modifying `VERSION`:
+
+```powershell
+.\scripts\publish.ps1 -Version 0.1.1-beta.1
 ```
 
 Artifacts are written to `artifacts\`. See [CONTRIBUTING.md](CONTRIBUTING.md#releasing) for the manual release procedure.

@@ -68,22 +68,26 @@ test: cover retry cancellation
 维护者手工发布流程：
 
 ```powershell
-# 在干净工作区执行
-.\scripts\publish.ps1 -Version 0.1.0
+# 在干净工作区执行；版本号自动读取仓库根目录 VERSION
+.\scripts\publish.ps1
 
-# 检查 artifacts\ 下的 ZIP 和 SHA-256 后
-# 创建并推送标签，再在 GitHub Release 上传两个文件
-git tag -a v0.1.0 -m "Akota Startup Manager v0.1.0"
-git push origin v0.1.0
+# -Version 仅用于不修改 VERSION 的临时或预发布覆盖
+# .\scripts\publish.ps1 -Version 0.1.1-beta.1
+
+# 检查 artifacts\ 下 standalone/runtime 两个 ZIP 及各自 SHA-256 后
+# 创建并推送与 VERSION 一致的标签，再上传四个文件
+$version = (Get-Content .\VERSION -Raw).Trim()
+git tag -a "v$version" -m "Akota Startup Manager v$version"
+git push origin "v$version"
 ```
 
 发布前还应：
 
-1. 更新 `CHANGELOG.md`，把目标版本从 Unreleased 转为发布日期。
-2. 确认程序集和发布包版本一致。
-3. 解压发行 ZIP，在普通用户权限下完成一次冒烟测试。
-4. 确认 ZIP 不包含 `Data/`、`Logs/`、测试输出或个人信息。
-5. 将 ZIP 和对应 `.sha256` 一起上传到 GitHub Release。
+1. 更新根目录 `VERSION`，并在 `CHANGELOG.md` 中把目标版本从 Unreleased 转为发布日期。
+2. 确认 standalone/runtime 两个包的程序集版本、归档文件名和 `VERSION` 一致。
+3. 分别解压两个发行 ZIP；在普通用户权限下完成 standalone 冒烟测试，并在已安装 .NET 10 Desktop Runtime 的环境测试 runtime 包。
+4. 确认两个 ZIP 均不包含 `Data/`、`Logs/`、测试输出或个人信息。
+5. 将两个 ZIP 和对应的两个 `.sha256` 文件一起上传到 GitHub Release。
 
 ## 许可证
 

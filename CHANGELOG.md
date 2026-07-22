@@ -10,6 +10,18 @@
 
 - 持续改进可访问性、条件测试体验与 Windows 集成测试。
 
+## [0.1.1] - 2026-07-22
+
+### Fixed
+
+- 修复初始化完成后功能按钮仍保持不可点击，以及列表选择变化不刷新相关按钮状态的问题。
+- 为不可用按钮增加明确的禁用外观，避免与界面遮挡混淆。
+
+### Changed
+
+- 使用根目录 `VERSION` 作为普通构建与发布脚本的统一版本来源，同时保留 `-Version` 临时覆盖能力。
+- 发布脚本一次生成无需预装 .NET 的 standalone 包，以及依赖 .NET 10 Desktop Runtime 的轻量 runtime 包，并分别提供 SHA-256 文件。
+
 ## [0.1.0] - 2026-07-22
 
 ### Added
@@ -26,5 +38,6 @@
 - `win-x64` 自包含便携发布脚本和 SHA-256 产物。
 - 中英文项目文档、GPL-3.0 许可证与 GitHub 社区模板。
 
-[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AkotaP/AkotaStartupManager/releases/tag/v0.1.0
