@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\AkotaStartupManager.Core\AkotaStartupManager.Core.csproj" />
+    <ProjectReference Include="..\AkotaStartupManager.Application\AkotaStartupManager.Application.csproj" />
+    <ProjectReference Include="..\AkotaStartupManager.Infrastructure\AkotaStartupManager.Infrastructure.csproj" />
+    <Resource Include="..\..\assets\icon.png" Link="Resources\icon.png" />
+    <Resource Include="Resources\app.ico" />
+  </ItemGroup>
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>AkotaStartupManager</AssemblyName>
+    <RootNamespace>AkotaStartupManager.App</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <Product>Akota Startup Manager</Product>
+    <Description>Reliable Windows startup orchestration and management.</Description>
+    <Authors>AkotaP</Authors>
+    <Copyright>Copyright © 2026 AkotaP</Copyright>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/AkotaP/AkotaStartupManager</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+  </PropertyGroup>
+</Project>

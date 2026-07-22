@@ -1,0 +1,75 @@
+name: Bug report / 缺陷报告
+description: Report reproducible incorrect behavior / 报告可重复的软件缺陷
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先确认问题存在于最新 Release，并删除日志中的用户名、令牌、内网地址等敏感内容。
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows 版本
+      placeholder: Windows 11 23H2 x64
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: 涉及的启动项来源
+      options:
+        - 不涉及启动项来源
+        - 注册表 Run / RunOnce
+        - 用户或公共启动文件夹
+        - Windows 计划任务
+        - 接管启动规则
+        - 系统托盘或界面
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重现步骤
+      placeholder: |
+        1. 打开……
+        2. 选择……
+        3. 点击……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 已脱敏日志或截图
+      description: 不要上传完整注册表导出、计划任务 XML、个人路径或凭据。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已检查现有 Issues，没有发现相同报告。
+          required: true
+        - label: 我已删除日志和截图中的敏感信息。
+          required: true
+        - label: 这不是未公开安全漏洞；安全问题将按 SECURITY.md 私下报告。
+          required: true

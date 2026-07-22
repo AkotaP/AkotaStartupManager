@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AkotaStartupManager.App/AkotaStartupManager.App.csproj" />
+    <Project Path="src/AkotaStartupManager.Application/AkotaStartupManager.Application.csproj" />
+    <Project Path="src/AkotaStartupManager.Core/AkotaStartupManager.Core.csproj" />
+    <Project Path="src/AkotaStartupManager.Infrastructure/AkotaStartupManager.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AkotaStartupManager.Core.Tests/AkotaStartupManager.Core.Tests.csproj" />
+    <Project Path="tests/AkotaStartupManager.Infrastructure.Tests/AkotaStartupManager.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
