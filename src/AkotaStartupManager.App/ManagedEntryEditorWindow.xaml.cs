@@ -132,7 +132,6 @@ public partial class ManagedEntryEditorWindow : Window
                 window.UseRegularExpression = RegexCheck.IsChecked == true;
                 break;
         }
-        RefreshTree();
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)

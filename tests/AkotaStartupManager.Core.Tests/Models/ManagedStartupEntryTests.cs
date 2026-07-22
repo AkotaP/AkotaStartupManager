@@ -103,4 +103,69 @@ public sealed class ManagedStartupEntryTests
         Assert.Equal("explorer", ((ProcessCondition)original.Conditions.Children[0]).ProcessName);
         Assert.Equal(5, ((ConditionGroup)original.Conditions.Children[1]).Children.Count);
     }
+
+    [Fact]
+    public void DisplayNameProperties_NotifyWithoutRedundantChanges()
+    {
+        AssertDisplayNameNotification(
+            new ConditionGroup(),
+            condition => condition.Operator = ConditionGroupOperator.Or,
+            nameof(ConditionGroup.Operator),
+            "任一满足");
+        AssertDisplayNameNotification(
+            new ProcessCondition(),
+            condition => condition.ProcessName = "sampleprocess",
+            nameof(ProcessCondition.ProcessName),
+            "进程：sampleprocess");
+        AssertDisplayNameNotification(
+            new TcpPortCondition { Port = 8080 },
+            condition => condition.Host = "localhost",
+            nameof(TcpPortCondition.Host),
+            "TCP：localhost:8080");
+        AssertDisplayNameNotification(
+            new TcpPortCondition(),
+            condition => condition.Port = 5432,
+            nameof(TcpPortCondition.Port),
+            "TCP：127.0.0.1:5432");
+        AssertDisplayNameNotification(
+            new HttpCondition(),
+            condition => condition.Url = "http://localhost/health",
+            nameof(HttpCondition.Url),
+            "HTTP：http://localhost/health");
+        AssertDisplayNameNotification(
+            new FileExistsCondition(),
+            condition => condition.Path = @"C:\ready.flag",
+            nameof(FileExistsCondition.Path),
+            @"文件：C:\ready.flag");
+        AssertDisplayNameNotification(
+            new WindowsServiceCondition(),
+            condition => condition.ServiceName = "ExampleService",
+            nameof(WindowsServiceCondition.ServiceName),
+            "服务：ExampleService");
+        AssertDisplayNameNotification(
+            new WindowTitleCondition(),
+            condition => condition.TitlePattern = "Example.*",
+            nameof(WindowTitleCondition.TitlePattern),
+            "窗口：Example.*");
+    }
+
+    private static void AssertDisplayNameNotification<TCondition>(
+        TCondition condition,
+        Action<TCondition> update,
+        string propertyName,
+        string expectedDisplayName)
+        where TCondition : StartupCondition
+    {
+        var notifications = new List<string?>();
+        condition.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
+
+        update(condition);
+
+        Assert.Equal([propertyName, nameof(StartupCondition.DisplayName)], notifications);
+        Assert.Equal(expectedDisplayName, condition.DisplayName);
+
+        notifications.Clear();
+        update(condition);
+        Assert.Empty(notifications);
+    }
 }

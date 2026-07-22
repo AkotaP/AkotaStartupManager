@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
 namespace AkotaStartupManager.Core.Models.Conditions;
@@ -10,12 +12,32 @@ namespace AkotaStartupManager.Core.Models.Conditions;
 [JsonDerivedType(typeof(FileExistsCondition), "fileExists")]
 [JsonDerivedType(typeof(WindowsServiceCondition), "windowsService")]
 [JsonDerivedType(typeof(WindowTitleCondition), "windowTitle")]
-public abstract class StartupCondition
+public abstract class StartupCondition : INotifyPropertyChanged
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public bool IsEnabled { get; set; } = true;
     public abstract string DisplayName { get; }
     public abstract StartupCondition DeepClone();
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
+    }
+
+    protected bool SetDisplayProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (!SetProperty(ref field, value, propertyName)) return false;
+        OnPropertyChanged(nameof(DisplayName));
+        return true;
+    }
+
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
 public enum ConditionGroupOperator
@@ -26,7 +48,14 @@ public enum ConditionGroupOperator
 
 public sealed class ConditionGroup : StartupCondition
 {
-    public ConditionGroupOperator Operator { get; set; } = ConditionGroupOperator.And;
+    private ConditionGroupOperator _operator = ConditionGroupOperator.And;
+
+    public ConditionGroupOperator Operator
+    {
+        get => _operator;
+        set => SetDisplayProperty(ref _operator, value);
+    }
+
     public List<StartupCondition> Children { get; set; } = [];
     public override string DisplayName => Operator == ConditionGroupOperator.And ? "全部满足" : "任一满足";
     public override StartupCondition DeepClone() => new ConditionGroup
@@ -40,7 +69,14 @@ public sealed class ConditionGroup : StartupCondition
 
 public sealed class ProcessCondition : StartupCondition
 {
-    public string ProcessName { get; set; } = string.Empty;
+    private string _processName = string.Empty;
+
+    public string ProcessName
+    {
+        get => _processName;
+        set => SetDisplayProperty(ref _processName, value);
+    }
+
     public override string DisplayName => $"进程：{ProcessName}";
     public override StartupCondition DeepClone() => new ProcessCondition
     {
@@ -52,8 +88,21 @@ public sealed class ProcessCondition : StartupCondition
 
 public sealed class TcpPortCondition : StartupCondition
 {
-    public string Host { get; set; } = "127.0.0.1";
-    public int Port { get; set; }
+    private string _host = "127.0.0.1";
+    private int _port;
+
+    public string Host
+    {
+        get => _host;
+        set => SetDisplayProperty(ref _host, value);
+    }
+
+    public int Port
+    {
+        get => _port;
+        set => SetDisplayProperty(ref _port, value);
+    }
+
     public int TimeoutMilliseconds { get; set; } = 1500;
     public override string DisplayName => $"TCP：{Host}:{Port}";
     public override StartupCondition DeepClone() => new TcpPortCondition
@@ -68,7 +117,14 @@ public sealed class TcpPortCondition : StartupCondition
 
 public sealed class HttpCondition : StartupCondition
 {
-    public string Url { get; set; } = "http://127.0.0.1/";
+    private string _url = "http://127.0.0.1/";
+
+    public string Url
+    {
+        get => _url;
+        set => SetDisplayProperty(ref _url, value);
+    }
+
     public int TimeoutMilliseconds { get; set; } = 3000;
     public override string DisplayName => $"HTTP：{Url}";
     public override StartupCondition DeepClone() => new HttpCondition
@@ -82,7 +138,14 @@ public sealed class HttpCondition : StartupCondition
 
 public sealed class FileExistsCondition : StartupCondition
 {
-    public string Path { get; set; } = string.Empty;
+    private string _path = string.Empty;
+
+    public string Path
+    {
+        get => _path;
+        set => SetDisplayProperty(ref _path, value);
+    }
+
     public override string DisplayName => $"文件：{Path}";
     public override StartupCondition DeepClone() => new FileExistsCondition
     {
@@ -94,7 +157,14 @@ public sealed class FileExistsCondition : StartupCondition
 
 public sealed class WindowsServiceCondition : StartupCondition
 {
-    public string ServiceName { get; set; } = string.Empty;
+    private string _serviceName = string.Empty;
+
+    public string ServiceName
+    {
+        get => _serviceName;
+        set => SetDisplayProperty(ref _serviceName, value);
+    }
+
     public override string DisplayName => $"服务：{ServiceName}";
     public override StartupCondition DeepClone() => new WindowsServiceCondition
     {
@@ -106,7 +176,14 @@ public sealed class WindowsServiceCondition : StartupCondition
 
 public sealed class WindowTitleCondition : StartupCondition
 {
-    public string TitlePattern { get; set; } = string.Empty;
+    private string _titlePattern = string.Empty;
+
+    public string TitlePattern
+    {
+        get => _titlePattern;
+        set => SetDisplayProperty(ref _titlePattern, value);
+    }
+
     public bool UseRegularExpression { get; set; }
     public override string DisplayName => $"窗口：{TitlePattern}";
     public override StartupCondition DeepClone() => new WindowTitleCondition

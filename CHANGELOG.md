@@ -10,6 +10,12 @@
 
 - 持续改进可访问性、条件测试体验与 Windows 集成测试。
 
+## [0.1.3] - 2026-07-22
+
+### Fixed
+
+- 修复在规则编辑器中输入条件参数时，条件树刷新导致当前条件失去选中、属性面板切回根节点的问题。
+
 ## [0.1.2] - 2026-07-22
 
 ### Added
@@ -49,7 +55,8 @@
 - `win-x64` 自包含便携发布脚本和 SHA-256 产物。
 - 中英文项目文档、GPL-3.0 许可证与 GitHub 社区模板。
 
-[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AkotaP/AkotaStartupManager/releases/tag/v0.1.0
