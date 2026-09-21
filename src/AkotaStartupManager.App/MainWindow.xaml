@@ -50,7 +50,15 @@
                 <TabItem>
                     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <StackPanel><TextBlock Text="接管启动" FontSize="30" FontWeight="SemiBold"/><WrapPanel Margin="0,14,0,12"><Button Content="添加规则" Command="{Binding AddManagedCommand}"/><Button Content="编辑规则" Command="{Binding EditManagedCommand}"/><Button Content="立即启动" Command="{Binding LaunchNowCommand}"/><Button Style="{StaticResource SecondaryButton}" Content="重新监控" Command="{Binding RestartMonitoringCommand}"/><Button Background="#FFB3261E" Content="删除规则" Command="{Binding RemoveManagedCommand}"/></WrapPanel></StackPanel>
-                        <Border Grid.Row="1" Style="{StaticResource Card}"><DataGrid x:Name="ManagedEntriesGrid" ItemsSource="{Binding ManagedEntries}" SelectedItem="{Binding SelectedManagedEntry}" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0" MouseDoubleClick="ManagedEntriesGrid_MouseDoubleClick"><DataGrid.Columns><DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" Width="65"/><DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="180"/><DataGridTextColumn Header="程序" Binding="{Binding ExecutablePath}" Width="*"/><DataGridTextColumn Header="轮询" Binding="{Binding PollIntervalSeconds, StringFormat={}{0} 秒}" Width="80"/><DataGridTextColumn Header="连续" Binding="{Binding RequiredConsecutiveSuccesses}" Width="65"/></DataGrid.Columns></DataGrid></Border>
+                        <Border Grid.Row="1" Style="{StaticResource Card}"><DataGrid x:Name="ManagedEntriesGrid" ItemsSource="{Binding ManagedEntries}" SelectedItem="{Binding SelectedManagedEntry}" AutoGenerateColumns="False" CanUserAddRows="False" BorderThickness="0" MouseDoubleClick="ManagedEntriesGrid_MouseDoubleClick"><DataGrid.Columns>
+                            <DataGridTemplateColumn Header="启用" Width="65" SortMemberPath="IsEnabled">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip="勾选后规则参与监控；取消勾选会立即停止该规则的监控" Click="ManagedEntryEnabled_Click"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="180" IsReadOnly="True"/><DataGridTextColumn Header="程序" Binding="{Binding ExecutablePath}" Width="*" IsReadOnly="True"/><DataGridTextColumn Header="轮询" Binding="{Binding PollIntervalSeconds, StringFormat={}{0} 秒}" Width="80" IsReadOnly="True"/><DataGridTextColumn Header="连续" Binding="{Binding RequiredConsecutiveSuccesses}" Width="65" IsReadOnly="True"/></DataGrid.Columns></DataGrid></Border>
                     </Grid>
                 </TabItem>
                 <TabItem>

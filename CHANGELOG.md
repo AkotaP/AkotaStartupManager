@@ -10,6 +10,12 @@
 
 - 持续改进可访问性、条件测试体验与 Windows 集成测试。
 
+## [0.1.4] - 2026-09-21
+
+### Fixed
+
+- 修复“接管启动”列表中“启用”列的复选框无法点击、切换不生效的问题；现在可以直接勾选或取消勾选单条规则，状态会即时保存并立即应用于监控。
+
 ## [0.1.3] - 2026-07-22
 
 ### Fixed
@@ -55,7 +61,8 @@
 - `win-x64` 自包含便携发布脚本和 SHA-256 产物。
 - 中英文项目文档、GPL-3.0 许可证与 GitHub 社区模板。
 
-[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.0...v0.1.1

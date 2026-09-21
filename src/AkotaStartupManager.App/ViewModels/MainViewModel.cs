@@ -21,6 +21,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly SelfStartupService _selfStartup;
     private readonly PrivilegeService _privilege;
     private readonly IPortablePathService _paths;
+    private readonly SemaphoreSlim _configurationGate = new(1, 1);
     private int _selectedPage;
     private bool _isBusy;
     private StartupItem? _selectedStartupItem;
@@ -319,6 +320,35 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedManagedEntry is not null) await _orchestrator.LaunchNowAsync(SelectedManagedEntry);
     }
 
+    /// <summary>
+    /// 切换单条接管规则的启用状态：先写入配置，再按新状态重启监控。
+    /// 返回 false 时模型值已回滚，调用方需要让界面绑定重新取值。
+    /// </summary>
+    public async Task<bool> SetManagedEntryEnabledAsync(ManagedStartupEntry entry, bool isEnabled)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        // 配置读取与写入是“读—改—写”组合，连续点击时需要串行执行，避免后一次覆盖前一次。
+        await _configurationGate.WaitAsync();
+        try
+        {
+            var succeeded = await ExecuteBusyAsync(async () =>
+            {
+                var configuration = await _repository.LoadAsync();
+                var target = configuration.Entries.FirstOrDefault(x => x.Id == entry.Id)
+                    ?? throw new InvalidOperationException("要更新的接管规则已不存在，请刷新后重试。");
+                target.IsEnabled = isEnabled;
+                await _repository.SaveAsync(configuration);
+                entry.IsEnabled = isEnabled;
+                await _orchestrator.StartAsync(ManagedEntries);
+                StatusText = isEnabled ? $"已启用规则“{entry.Name}”" : $"已停用规则“{entry.Name}”";
+            }, "更新启用状态失败");
+
+            if (!succeeded) entry.IsEnabled = !isEnabled;
+            return succeeded;
+        }
+        finally { _configurationGate.Release(); }
+    }
+
     public async Task RestartMonitoringAsync()
     {
         await _orchestrator.StartAsync(ManagedEntries);
@@ -348,11 +378,15 @@ public sealed class MainViewModel : ObservableObject
         RestartMonitoringCommand.NotifyCanExecuteChanged();
     }
 
-    private async Task ExecuteBusyAsync(Func<Task> action, string errorTitle)
+    private async Task<bool> ExecuteBusyAsync(Func<Task> action, string errorTitle)
     {
         IsBusy = true;
-        try { await action(); }
-        catch (Exception ex) { System.Windows.MessageBox.Show(ex.Message, errorTitle, MessageBoxButton.OK, MessageBoxImage.Error); }
+        try { await action(); return true; }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(ex.Message, errorTitle, MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
         finally { IsBusy = false; }
     }
 

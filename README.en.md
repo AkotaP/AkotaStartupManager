@@ -18,7 +18,7 @@
 </p>
 
 > [!IMPORTANT]
-> This project is currently at the early `0.1.3` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
+> This project is currently at the early `0.1.4` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
 
 ## Why use it?
 
