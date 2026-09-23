@@ -1,0 +1,166 @@
+name: Release
+
+# 推送带新版本号的提交，或推送 v* 标签时，在远程构建并发布 Release。
+# 同一版本只会发布一次：该标签已存在已发布的 Release 时直接跳过，因此日常提交不会误触发。
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 覆盖 VERSION 文件中的版本号（留空则读取根目录 VERSION）
+        required: false
+        type: string
+      force:
+        description: 该版本已发布过时，仍然重新上传发行包并更新 Release 说明
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: 解析版本号
+        id: version
+        shell: pwsh
+        env:
+          # 通过环境变量传入，避免手动输入的版本号被直接插值进脚本。
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $override = if ($env:INPUT_VERSION) { $env:INPUT_VERSION.Trim() } else { '' }
+          $version = if ($override) { $override } else { (Get-Content VERSION -Raw).Trim() }
+          $pattern = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
+          if ($version -notmatch $pattern) {
+            throw "版本号不是合法的语义化版本：'$version'"
+          }
+          $tag = "v$version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          Write-Host "目标版本：$version（标签 $tag）"
+
+      - name: 检查该版本是否已经发布
+        id: check
+        shell: pwsh
+        env:
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $state = 'none'
+          $json = gh release view $tag --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0 -and $json) {
+            $state = if (($json | ConvertFrom-Json).isDraft) { 'draft' } else { 'published' }
+          }
+          $force = $env:INPUT_FORCE -eq 'true'
+          if ($state -eq 'published' -and -not $force) {
+            Write-Host "::notice::$tag 已经发布过 Release，本次跳过。要重新发布请在 Actions 里手动运行并勾选 force，或先删除该 Release。"
+            $state = 'skip'
+          }
+          "state=$state" >> $env:GITHUB_OUTPUT
+          # gh release view 在 Release 不存在时返回非 0，这里属于预期结果；
+          # Actions 的 pwsh 包装器会用 $LASTEXITCODE 决定步骤退出码，必须显式归零。
+          exit 0
+
+      - name: 确保标签存在
+        if: steps.check.outputs.state != 'skip'
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          git fetch --tags --force --quiet
+          git rev-parse -q --verify "refs/tags/$tag" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "标签 $tag 已存在，保持不变。"
+            exit 0
+          }
+          # 与手工发布流程一致：带注释的标签，不修改仓库的 git 配置。
+          git -c user.name='github-actions[bot]' `
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' `
+              tag -a $tag -m "Akota Startup Manager $tag" $env:GITHUB_SHA
+          git push origin $tag
+
+      - name: 构建发行包
+        if: steps.check.outputs.state != 'skip'
+        shell: pwsh
+        run: |
+          # 复用本地发布脚本，保证远程与本地产物完全一致（含测试与 SHA-256）。
+          ./scripts/publish.ps1 -Version '${{ steps.version.outputs.version }}'
+
+      - name: 从 CHANGELOG 生成 Release 说明
+        if: steps.check.outputs.state != 'skip'
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $pattern = '(?ms)^## \[' + [regex]::Escape($version) + '\][^\n]*\r?\n(.*?)(?=^## \[|\z)'
+          $section = [regex]::Match($changelog, $pattern)
+          if (-not $section.Success) {
+            throw "CHANGELOG.md 中找不到 [$version] 小节，请先补上再发布。"
+          }
+          $notes = @(
+            '提醒：软件未经严格测试。请在修改系统级启动项前阅读 README，并保留重要配置备份。'
+            ''
+            $section.Groups[1].Value.Trim()
+            ''
+            '下载后请用同名 `.zip.sha256` 文件校验 SHA-256。'
+          )
+          Set-Content -Path release-notes.md -Value ($notes -join "`n") -Encoding utf8
+          Get-Content release-notes.md
+
+      - name: 创建草稿 Release
+        if: steps.check.outputs.state == 'none'
+        shell: pwsh
+        run: |
+          # 先建草稿，资产全部上传成功后再转为已发布；中途失败不会留下残缺的 Release。
+          gh release create '${{ steps.version.outputs.tag }}' --draft --verify-tag `
+            --title '${{ steps.version.outputs.tag }}' --notes-file release-notes.md
+
+      - name: 上传发行包
+        if: steps.check.outputs.state != 'skip'
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $base = "artifacts/AkotaStartupManager-v$version-win-x64"
+          $assets = @(
+            "$base-standalone.zip"
+            "$base-standalone.zip.sha256"
+            "$base-runtime.zip"
+            "$base-runtime.zip.sha256"
+          )
+          foreach ($asset in $assets) {
+            if (-not (Test-Path $asset)) { throw "缺少发行产物：$asset" }
+          }
+          gh release upload '${{ steps.version.outputs.tag }}' @assets --clobber
+
+      - name: 发布 Release
+        if: steps.check.outputs.state != 'skip'
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $arguments = @('release', 'edit', $tag, '--draft=false', '--notes-file', 'release-notes.md')
+          if ('${{ steps.version.outputs.prerelease }}' -eq 'true') {
+            $arguments += @('--prerelease', '--latest=false')
+          }
+          gh @arguments
+          gh release view $tag --json tagName,isDraft,isPrerelease,url

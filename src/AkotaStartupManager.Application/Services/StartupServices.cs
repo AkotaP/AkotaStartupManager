@@ -56,12 +56,35 @@ public sealed class StartupManagementService(
         }
     }
 
-    public async Task RestoreAsync(StartupBackupRecord backup, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 恢复一条备份。已写入的原生启动项不会因为之后的配置写入失败而回滚，
+    /// 但这种情况会以明确的异常上报，不会被当成成功。
+    /// </summary>
+    public async Task RestoreAsync(
+        StartupBackupRecord backup,
+        bool removeLinkedManagedRule = false,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(backup);
         await GetProvider(backup.SourceType).RestoreAsync(backup, cancellationToken);
+
         var configuration = await repository.LoadAsync(cancellationToken);
         configuration.Backups.RemoveAll(x => x.StartupItemId.Equals(backup.StartupItemId, StringComparison.OrdinalIgnoreCase));
-        await repository.SaveAsync(configuration, cancellationToken);
+        if (removeLinkedManagedRule)
+        {
+            configuration.Entries.RemoveAll(x => x.OriginalStartupItemId is { } id &&
+                                                 id.Equals(backup.StartupItemId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        try
+        {
+            await repository.SaveAsync(configuration, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"原生启动项“{backup.Name}”已恢复，但备份记录未更新成功：{ex.Message}", ex);
+        }
     }
 
     public async Task TakeOverAsync(

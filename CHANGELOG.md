@@ -10,6 +10,22 @@
 
 - 持续改进可访问性、条件测试体验与 Windows 集成测试。
 
+## [0.2.0] - 2026-09-23
+
+### Fixed
+
+- 修复注册表启动项的值类型为 `REG_BINARY`、`REG_MULTI_SZ` 等非字符串时，禁用后无法恢复、原始数据永久丢失的问题；现在按值类型完整保存，并在恢复时还原。
+- 修复移动便携目录后，启动文件夹的备份因记录的是绝对路径而全部失效的问题；备份位置改为相对程序目录记录，并保留按原始文件名找回的兜底。
+- 修复恢复系统级启动项时不检查管理员权限、只抛出底层异常的问题；恢复现在与禁用一样先做提权确认。
+- 修复恢复一条已被“接管启动”接管的启动项时保留接管规则、导致同一程序在登录时可能被启动两次的问题；恢复时可一并删除关联规则。
+- 修复禁用后的启动项只能恢复最近一条、其余备份在界面上完全无法访问的问题。
+
+### Changed
+
+- “Windows 启动项”页面的“恢复最近一项”改为“备份与恢复”窗口：可查看全部备份及其可恢复状态，选择任意一条还原，并丢弃不再需要的备份记录。
+- 备份窗口会列出备份目录中没有对应记录的备份文件（例如配置文件损坏回退后留下的），可指定恢复到当前用户或公共启动文件夹。
+- 删除“Windows 启动项”列表中始终勾选且不可交互的“启用”列；系统级启动项统一通过“禁用并备份”处理。
+
 ## [0.1.4] - 2026-09-21
 
 ### Fixed
@@ -61,7 +77,8 @@
 - `win-x64` 自包含便携发布脚本和 SHA-256 产物。
 - 中英文项目文档、GPL-3.0 许可证与 GitHub 社区模板。
 
-[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/AkotaP/AkotaStartupManager/compare/v0.1.1...v0.1.2

@@ -42,7 +42,7 @@ public sealed class StartupFolderProvider(IPortablePathService paths) : IStartup
             throw new FileNotFoundException("启动文件已被外部删除。", item.Location);
         }
 
-        var backupDirectory = Path.Combine(paths.BackupDirectory, "StartupFolders");
+        var backupDirectory = Path.Combine(paths.BackupDirectory, BackupPathResolver.StartupFolderBackupSubdirectory);
         Directory.CreateDirectory(backupDirectory);
         var backupPath = Path.Combine(backupDirectory, $"{Guid.NewGuid():N}-{Path.GetFileName(item.Location)}");
         File.Move(item.Location, backupPath);
@@ -53,6 +53,8 @@ public sealed class StartupFolderProvider(IPortablePathService paths) : IStartup
             Name = item.Name,
             OriginalLocation = item.Location,
             BackupLocation = backupPath,
+            RelativeBackupPath = Path.GetRelativePath(paths.BaseDirectory, backupPath),
+            RequiresElevation = item.RequiresElevation,
             WasEnabled = true
         });
     }
@@ -60,17 +62,17 @@ public sealed class StartupFolderProvider(IPortablePathService paths) : IStartup
     public Task RestoreAsync(StartupBackupRecord backup, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(backup.BackupLocation) || !File.Exists(backup.BackupLocation))
-        {
-            throw new FileNotFoundException("启动文件的备份不存在。", backup.BackupLocation);
-        }
+        var backupPath = BackupPathResolver.Resolve(backup, paths)
+            ?? throw new FileNotFoundException(
+                $"备份“{backup.Name}”的文件不存在，可能已被移动或删除。",
+                backup.BackupLocation ?? backup.RelativeBackupPath ?? string.Empty);
         if (File.Exists(backup.OriginalLocation))
         {
             throw new IOException($"原位置已存在同名文件：{backup.OriginalLocation}");
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(backup.OriginalLocation)!);
-        File.Move(backup.BackupLocation, backup.OriginalLocation);
+        File.Move(backupPath, backup.OriginalLocation);
         return Task.CompletedTask;
     }
 }

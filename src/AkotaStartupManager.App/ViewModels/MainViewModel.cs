@@ -24,8 +24,11 @@ public sealed class MainViewModel : ObservableObject
     private readonly SemaphoreSlim _configurationGate = new(1, 1);
     private int _selectedPage;
     private bool _isBusy;
+    private bool _suspendBackupRefresh;
     private StartupItem? _selectedStartupItem;
     private ManagedStartupEntry? _selectedManagedEntry;
+    private BackupRow? _selectedBackupRow;
+    private OrphanBackupRow? _selectedOrphanRow;
     private string _statusText = "正在初始化…";
     private string _searchText = string.Empty;
 
@@ -49,14 +52,20 @@ public sealed class MainViewModel : ObservableObject
         RefreshCommand = new AsyncCommand(RefreshAsync, () => !IsBusy);
         DisableCommand = new AsyncCommand(DisableSelectedAsync, () => SelectedStartupItem is not null && !IsBusy);
         TakeOverCommand = new AsyncCommand(TakeOverSelectedAsync, () => SelectedStartupItem is not null && !IsBusy);
-        RestoreCommand = new AsyncCommand(RestoreLastAsync, () => Backups.Count > 0 && !IsBusy);
+        OpenBackupsCommand = new RelayCommand(OpenBackups);
+        RestoreBackupCommand = new AsyncCommand(RestoreSelectedBackupAsync,
+            () => SelectedBackupRow?.CanRestore == true && !IsBusy);
+        DiscardBackupCommand = new AsyncCommand(DiscardSelectedBackupAsync,
+            () => SelectedBackupRow is not null && !IsBusy);
+        RestoreOrphanCommand = new AsyncCommand(RestoreSelectedOrphanAsync,
+            () => SelectedOrphanRow is not null && !IsBusy);
         AddManagedCommand = new AsyncCommand(AddManagedAsync, () => !IsBusy);
         EditManagedCommand = new AsyncCommand(EditManagedAsync, () => SelectedManagedEntry is not null && !IsBusy);
         RemoveManagedCommand = new AsyncCommand(RemoveManagedAsync, () => SelectedManagedEntry is not null && !IsBusy);
         LaunchNowCommand = new AsyncCommand(LaunchSelectedNowAsync, () => SelectedManagedEntry is not null && !IsBusy);
         RestartMonitoringCommand = new AsyncCommand(RestartMonitoringAsync, () => !IsBusy);
         OpenLogsCommand = new RelayCommand(OpenLogs);
-        Backups.CollectionChanged += (_, _) => RestoreCommand.NotifyCanExecuteChanged();
+        Backups.CollectionChanged += (_, _) => RefreshBackups();
         logger.MessageWritten += (_, line) => WpfApplication.Current.Dispatcher.Invoke(() => LogLines.Insert(0, line));
         _orchestrator.StateChanged += (_, state) => WpfApplication.Current.Dispatcher.Invoke(() => UpdateRuntimeState(state));
     }
@@ -64,19 +73,27 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<StartupItem> StartupItems { get; } = [];
     public ObservableCollection<ManagedStartupEntry> ManagedEntries { get; } = [];
     public ObservableCollection<StartupBackupRecord> Backups { get; } = [];
+    public ObservableCollection<BackupRow> BackupRows { get; } = [];
+    public ObservableCollection<OrphanBackupRow> OrphanRows { get; } = [];
     public ObservableCollection<ManagedEntryRuntimeState> RuntimeStates { get; } = [];
     public ObservableCollection<string> LogLines { get; } = [];
 
     public AsyncCommand RefreshCommand { get; }
     public AsyncCommand DisableCommand { get; }
     public AsyncCommand TakeOverCommand { get; }
-    public AsyncCommand RestoreCommand { get; }
+    public RelayCommand OpenBackupsCommand { get; }
+    public AsyncCommand RestoreBackupCommand { get; }
+    public AsyncCommand DiscardBackupCommand { get; }
+    public AsyncCommand RestoreOrphanCommand { get; }
     public AsyncCommand AddManagedCommand { get; }
     public AsyncCommand EditManagedCommand { get; }
     public AsyncCommand RemoveManagedCommand { get; }
     public AsyncCommand LaunchNowCommand { get; }
     public AsyncCommand RestartMonitoringCommand { get; }
     public RelayCommand OpenLogsCommand { get; }
+
+    /// <summary>程序即将以管理员身份重启，已打开的窗口应据此关闭自己。</summary>
+    public event EventHandler? ElevationRestartRequested;
 
     public int SelectedPage { get => _selectedPage; set => SetProperty(ref _selectedPage, value); }
     public bool IsBusy
@@ -110,6 +127,28 @@ public sealed class MainViewModel : ObservableObject
             LaunchNowCommand.NotifyCanExecuteChanged();
         }
     }
+    public BackupRow? SelectedBackupRow
+    {
+        get => _selectedBackupRow;
+        set
+        {
+            if (!SetProperty(ref _selectedBackupRow, value)) return;
+            RestoreBackupCommand.NotifyCanExecuteChanged();
+            DiscardBackupCommand.NotifyCanExecuteChanged();
+        }
+    }
+    public OrphanBackupRow? SelectedOrphanRow
+    {
+        get => _selectedOrphanRow;
+        set
+        {
+            if (!SetProperty(ref _selectedOrphanRow, value)) return;
+            RestoreOrphanCommand.NotifyCanExecuteChanged();
+        }
+    }
+    public bool HasOrphanBackups => OrphanRows.Count > 0;
+    public bool HasBackups => BackupRows.Count > 0;
+    public string BackupCountText => Backups.Count == 0 ? "备份与恢复…" : $"备份与恢复（{Backups.Count}）…";
     public bool StartWithWindows { get => _selfStartup.IsEnabled; set { _selfStartup.SetEnabled(value); OnPropertyChanged(); } }
     public int StartupItemCount => StartupItems.Count;
     public int ManagedCount => ManagedEntries.Count;
@@ -121,9 +160,8 @@ public sealed class MainViewModel : ObservableObject
     {
         var configuration = await _repository.LoadAsync();
         ManagedEntries.Clear();
-        Backups.Clear();
         foreach (var entry in configuration.Entries) ManagedEntries.Add(entry);
-        foreach (var backup in configuration.Backups) Backups.Add(backup);
+        ReplaceBackups(configuration.Backups);
         await RefreshAsync();
         await _orchestrator.StartAsync(ManagedEntries);
         StatusText = "监控运行中";
@@ -158,23 +196,27 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(StartupItemCount));
     }
 
-    private bool EnsureElevationIfRequired(StartupItem item, string action)
+    private ElevationDecision EnsureElevationFor(bool requiresElevation, string name, string action)
     {
-        if (!item.RequiresElevation || _privilege.IsAdministrator) return true;
+        if (!requiresElevation || _privilege.IsAdministrator) return ElevationDecision.Proceed;
         if (System.Windows.MessageBox.Show(
-                $"“{item.Name}”属于系统范围，{action}需要管理员权限。是否以管理员身份重新启动？",
+                $"“{name}”属于系统范围，{action}需要管理员权限。是否以管理员身份重新启动？",
                 "需要管理员权限", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
         {
+            // 提权会重启整个程序并关闭所有窗口，先给已打开的窗口一个收尾的机会。
+            ElevationRestartRequested?.Invoke(this, EventArgs.Empty);
             _privilege.RestartElevated("--show-page", "1");
             ((global::AkotaStartupManager.App.App)WpfApplication.Current).ExitApplication();
+            return ElevationDecision.RestartingElevated;
         }
-        return false;
+        return ElevationDecision.Declined;
     }
 
     private async Task DisableSelectedAsync()
     {
         if (SelectedStartupItem is null) return;
-        if (!EnsureElevationIfRequired(SelectedStartupItem, "禁用此启动项")) return;
+        if (EnsureElevationFor(SelectedStartupItem.RequiresElevation, SelectedStartupItem.Name, "禁用此启动项")
+            != ElevationDecision.Proceed) return;
         if (System.Windows.MessageBox.Show($"将禁用“{SelectedStartupItem.Name}”并保存可恢复备份。继续吗？", "确认禁用",
             MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         await ExecuteBusyAsync(async () =>
@@ -189,7 +231,7 @@ public sealed class MainViewModel : ObservableObject
     {
         if (SelectedStartupItem is null) return;
         var item = SelectedStartupItem;
-        if (!EnsureElevationIfRequired(item, "接管此启动项")) return;
+        if (EnsureElevationFor(item.RequiresElevation, item.Name, "接管此启动项") != ElevationDecision.Proceed) return;
         var executablePath = item.Command;
         if (!File.Exists(executablePath) || !executablePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
         {
@@ -234,16 +276,188 @@ public sealed class MainViewModel : ObservableObject
         }, "接管启动项失败");
     }
 
-    private async Task RestoreLastAsync()
+    private void OpenBackups()
     {
-        var backup = Backups.LastOrDefault();
-        if (backup is null) return;
+        RefreshBackups();
+        var window = new global::AkotaStartupManager.App.BackupListWindow(this)
+        {
+            Owner = WpfApplication.Current.MainWindow
+        };
+        window.ShowDialog();
+    }
+
+    private async Task RestoreSelectedBackupAsync()
+    {
+        if (SelectedBackupRow is not null) await RestoreBackupAsync(SelectedBackupRow);
+    }
+
+    /// <summary>
+    /// 恢复一条备份。需要提权重启时先触发 <see cref="ElevationRestartRequested"/>，
+    /// 让已打开的窗口有机会收尾，然后才退出程序。
+    /// </summary>
+    public async Task RestoreBackupAsync(BackupRow? row)
+    {
+        if (row is null) return;
+
+        var elevation = EnsureElevationFor(StartupElevationResolver.RequiresElevation(row.Record), row.Name, "恢复此启动项");
+        if (elevation != ElevationDecision.Proceed) return;
+
+        // 被“接管启动”接管的启动项，恢复原生自启后会和接管规则一起把程序拉起来，必须让用户明确选择。
+        var removeLinkedRule = false;
+        var linked = ManagedEntries.FirstOrDefault(x =>
+            x.OriginalStartupItemId is { } id && id.Equals(row.Record.StartupItemId, StringComparison.OrdinalIgnoreCase));
+        if (linked is not null)
+        {
+            var choice = System.Windows.MessageBox.Show(
+                $"“{row.Name}”已被接管规则“{linked.Name}”接管。恢复原生启动项后，该程序可能在登录时被启动两次。\n\n" +
+                "选择“是”同时删除该接管规则；选择“否”保留规则，只恢复原生启动项。",
+                "该启动项已被接管", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+            if (choice == MessageBoxResult.Cancel) return;
+            removeLinkedRule = choice == MessageBoxResult.Yes;
+        }
+
+        if (System.Windows.MessageBox.Show(
+                $"将把“{row.Name}”恢复到原位置：\n{row.LocationText}\n\n继续吗？", "确认恢复",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         await ExecuteBusyAsync(async () =>
         {
-            await _management.RestoreAsync(backup);
+            await _management.RestoreAsync(row.Record, removeLinkedRule);
             await ReloadConfigurationAsync();
             await RefreshAsync();
+            if (removeLinkedRule) await _orchestrator.StartAsync(ManagedEntries);
+            StatusText = $"已恢复“{row.Name}”";
         }, "恢复启动项失败");
+    }
+
+    private async Task DiscardSelectedBackupAsync()
+    {
+        var row = SelectedBackupRow;
+        if (row is null) return;
+        var backupPath = BackupPathResolver.Resolve(row.Record, _paths);
+        var fileNote = backupPath is null ? string.Empty : "\n备份文件也会一并删除。";
+        if (System.Windows.MessageBox.Show(
+                $"确定丢弃备份“{row.Name}”吗？\n\n这条备份记录会被删除，该启动项将无法再通过本工具恢复。{fileNote}",
+                "丢弃备份", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var configuration = await _repository.LoadAsync();
+            configuration.Backups.RemoveAll(x => x.StartupItemId.Equals(row.Record.StartupItemId, StringComparison.OrdinalIgnoreCase));
+            await _repository.SaveAsync(configuration);
+            try
+            {
+                if (backupPath is not null) File.Delete(backupPath);
+            }
+            catch (IOException)
+            {
+                // 记录已经移除，文件留在备份目录里会出现在“未登记的备份文件”列表，仍然可以恢复。
+            }
+
+            await ReloadConfigurationAsync();
+            StatusText = $"已丢弃备份“{row.Name}”";
+        }, "丢弃备份失败");
+    }
+
+    private async Task RestoreSelectedOrphanAsync()
+    {
+        var row = SelectedOrphanRow;
+        if (row is null) return;
+
+        var userStartup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        var commonStartup = Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup);
+        var choice = System.Windows.MessageBox.Show(
+            $"要把“{row.OriginalFileName}”恢复到哪个启动文件夹？\n\n是：当前用户\n{userStartup}\n\n否：所有用户\n{commonStartup}",
+            "恢复未登记的备份", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        if (choice == MessageBoxResult.Cancel) return;
+
+        if (choice == MessageBoxResult.No &&
+            EnsureElevationFor(true, row.OriginalFileName, "恢复到公共启动文件夹") != ElevationDecision.Proceed) return;
+
+        var targetFolder = choice == MessageBoxResult.Yes ? userStartup : commonStartup;
+        var targetPath = Path.Combine(targetFolder, row.OriginalFileName);
+        if (File.Exists(targetPath))
+        {
+            System.Windows.MessageBox.Show($"目标位置已存在同名文件：\n{targetPath}", "无法恢复",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            Directory.CreateDirectory(targetFolder);
+            File.Move(row.BackupPath, targetPath);
+            await RefreshAsync();
+            RefreshBackups();
+            StatusText = $"已恢复未登记的备份“{row.OriginalFileName}”";
+        }, "恢复未登记的备份失败");
+    }
+
+    private void ReplaceBackups(IEnumerable<StartupBackupRecord> backups)
+    {
+        // 逐条添加会触发多次 CollectionChanged，这里抑制中间刷新，只在结束后重建一次展示行。
+        _suspendBackupRefresh = true;
+        try
+        {
+            Backups.Clear();
+            foreach (var backup in backups) Backups.Add(backup);
+        }
+        finally { _suspendBackupRefresh = false; }
+        RefreshBackups();
+    }
+
+    private void RefreshBackups()
+    {
+        if (_suspendBackupRefresh) return;
+
+        var selectedId = SelectedBackupRow?.Record.StartupItemId;
+        BackupRows.Clear();
+        foreach (var backup in Backups)
+        {
+            BackupRows.Add(new BackupRow(backup, StartupBackupInspector.Inspect(backup, _paths)));
+        }
+        SelectedBackupRow = BackupRows.FirstOrDefault(x => x.Record.StartupItemId == selectedId);
+        RefreshOrphans();
+
+        OnPropertyChanged(nameof(BackupCountText));
+        OnPropertyChanged(nameof(HasBackups));
+        RestoreBackupCommand.NotifyCanExecuteChanged();
+        DiscardBackupCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// 找出磁盘上存在、但没有任何备份记录引用的备份文件。
+    /// 配置损坏回退到 config.previous.json 时会丢掉较新的记录，这些文件就成了界面上够不着的孤儿。
+    /// </summary>
+    private void RefreshOrphans()
+    {
+        OrphanRows.Clear();
+        var directory = Path.Combine(_paths.BackupDirectory, BackupPathResolver.StartupFolderBackupSubdirectory);
+        if (Directory.Exists(directory))
+        {
+            var referenced = Backups
+                .Where(x => x.SourceType == StartupSourceType.StartupFolder)
+                .Select(x => BackupPathResolver.Resolve(x, _paths))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => Path.GetFullPath(x!))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var file in Directory.EnumerateFiles(directory).OrderByDescending(File.GetLastWriteTimeUtc))
+            {
+                if (referenced.Contains(Path.GetFullPath(file))) continue;
+                var fileName = Path.GetFileName(file);
+                // 备份文件名固定为 {32 位 guid}-{原始文件名}。
+                var originalFileName = fileName.Length > 33 && fileName[32] == '-' ? fileName[33..] : fileName;
+                OrphanRows.Add(new OrphanBackupRow(file, originalFileName, new FileInfo(file).Length));
+            }
+        }
+
+        if (SelectedOrphanRow is not null && !OrphanRows.Contains(SelectedOrphanRow)) SelectedOrphanRow = null;
+        OnPropertyChanged(nameof(HasOrphanBackups));
+        RestoreOrphanCommand.NotifyCanExecuteChanged();
     }
 
     private async Task AddManagedAsync()
@@ -359,9 +573,8 @@ public sealed class MainViewModel : ObservableObject
     {
         var configuration = await _repository.LoadAsync();
         ManagedEntries.Clear();
-        Backups.Clear();
         foreach (var entry in configuration.Entries) ManagedEntries.Add(entry);
-        foreach (var backup in configuration.Backups) Backups.Add(backup);
+        ReplaceBackups(configuration.Backups);
         OnPropertyChanged(nameof(ManagedCount));
     }
 
@@ -370,7 +583,9 @@ public sealed class MainViewModel : ObservableObject
         RefreshCommand.NotifyCanExecuteChanged();
         DisableCommand.NotifyCanExecuteChanged();
         TakeOverCommand.NotifyCanExecuteChanged();
-        RestoreCommand.NotifyCanExecuteChanged();
+        RestoreBackupCommand.NotifyCanExecuteChanged();
+        DiscardBackupCommand.NotifyCanExecuteChanged();
+        RestoreOrphanCommand.NotifyCanExecuteChanged();
         AddManagedCommand.NotifyCanExecuteChanged();
         EditManagedCommand.NotifyCanExecuteChanged();
         RemoveManagedCommand.NotifyCanExecuteChanged();
@@ -400,4 +615,12 @@ public sealed class MainViewModel : ObservableObject
     }
 
     private void OpenLogs() => Process.Start(new ProcessStartInfo { FileName = _paths.LogsDirectory, UseShellExecute = true });
+}
+
+/// <summary>是否需要管理员权限的判断结果。</summary>
+internal enum ElevationDecision
+{
+    Proceed,
+    Declined,
+    RestartingElevated
 }

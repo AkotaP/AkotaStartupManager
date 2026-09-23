@@ -18,7 +18,7 @@
 </p>
 
 > [!IMPORTANT]
-> This project is currently at the early `0.1.4` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
+> This project is currently at the early `0.2.0` stage. Understand the impact and back up important settings before changing machine-wide registry entries, the common Startup folder, or scheduled tasks.
 
 ## Why use it?
 
@@ -33,7 +33,7 @@ Native Windows startup settings can only say “start after sign-in.” They can
 - Manage registry `Run` / `RunOnce` entries for current user and machine, including 32/64-bit views
 - Manage per-user and common Startup folders
 - Manage Windows scheduled tasks with boot or logon triggers
-- Preserve recoverable backups when disabling native startup entries
+- Preserve recoverable backups when disabling native startup entries; review every backup with its restore status and restore any of them from the **Backups** window
 - Convert a native startup item directly into a managed rule
 - Edit existing managed rules from the toolbar or by double-clicking a row; cancelling leaves the saved rule unchanged
 - Build nested AND / OR condition trees with:
@@ -62,7 +62,7 @@ Native Windows startup settings can only say “start after sign-in.” They can
    - `AkotaStartupManager-v*-win-x64-runtime.zip` — smaller download that requires the .NET 10 Desktop Runtime.
 2. Verify the SHA-256 value using the matching `.zip.sha256` file, then extract the ZIP to a user-writable directory.
 3. Run `AkotaStartupManager.exe`.
-4. Use **Windows Startup** to disable, restore, or take over an entry.
+4. Use **Windows Startup** to disable or take over an entry. Disabled entries are kept in the **Backups** window, where you can restore any of them.
 5. Use **Managed Startup** to configure the target, stability policy, and dependencies. Select a rule and click **Edit Rule**, or double-click its row, to modify it later.
 
 > [!WARNING]
@@ -121,7 +121,7 @@ Use `-Version` for a temporary override without modifying `VERSION`:
 .\scripts\publish.ps1 -Version 0.1.1-beta.1
 ```
 
-Artifacts are written to `artifacts\`. See [CONTRIBUTING.md](CONTRIBUTING.md#releasing) for the manual release procedure.
+Artifacts are written to `artifacts\`. Pushing a commit with a new version number makes GitHub Actions run the same build and publish the release automatically, with no manual upload; see [CONTRIBUTING.md](CONTRIBUTING.md#releasing) for the full release procedure.
 
 ## Repository layout
 

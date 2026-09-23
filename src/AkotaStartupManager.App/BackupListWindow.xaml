@@ -1,0 +1,75 @@
+<Window x:Class="AkotaStartupManager.App.BackupListWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="备份与恢复" Width="920" Height="640" MinWidth="720" MinHeight="460"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </Window.Resources>
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="备份与恢复" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Text="禁用或接管原生启动项时会保存可恢复备份，不会做不可逆删除。选择任意一条即可恢复到原位置。"
+                       Foreground="{StaticResource MutedBrush}" Margin="0,5,0,16" TextWrapping="Wrap"/>
+        </StackPanel>
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0">
+            <Grid>
+                <DataGrid x:Name="BackupGrid" ItemsSource="{Binding BackupRows}" SelectedItem="{Binding SelectedBackupRow}"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" BorderThickness="0"
+                          MouseDoubleClick="BackupGrid_MouseDoubleClick">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="170"/>
+                        <DataGridTextColumn Header="来源" Binding="{Binding SourceText}" Width="90"/>
+                        <DataGridTextColumn Header="状态" Binding="{Binding StatusText}" Width="150"/>
+                        <DataGridTextColumn Header="原始位置" Binding="{Binding LocationText}" Width="*"/>
+                        <DataGridTextColumn Header="备份时间" Binding="{Binding CreatedAtText}" Width="130"/>
+                        <DataGridTextColumn Header="权限" Binding="{Binding ElevationText}" Width="90"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                           Text="还没有任何备份。在“Windows 启动项”页面对条目执行“禁用并备份”后，恢复入口会出现在这里。">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasBackups}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,14,0,0"
+                Visibility="{Binding HasOrphanBackups, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <TextBlock Text="未登记的备份文件" FontSize="17" FontWeight="SemiBold"/>
+                <TextBlock Text="这些文件位于备份目录，但没有对应的备份记录（例如配置损坏回退到上一版之后）。可以指定恢复到哪个启动文件夹。"
+                           Foreground="{StaticResource MutedBrush}" Margin="0,5,0,8" TextWrapping="Wrap"/>
+                <DataGrid x:Name="OrphanGrid" ItemsSource="{Binding OrphanRows}" SelectedItem="{Binding SelectedOrphanRow}"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" BorderThickness="0" MaxHeight="150">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="原始文件名" Binding="{Binding OriginalFileName}" Width="240"/>
+                        <DataGridTextColumn Header="大小" Binding="{Binding SizeText}" Width="90"/>
+                        <DataGridTextColumn Header="备份文件" Binding="{Binding FileName}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Button Style="{StaticResource SecondaryButton}" Content="恢复到启动文件夹…" HorizontalAlignment="Left"
+                        Command="{Binding RestoreOrphanCommand}"/>
+            </StackPanel>
+        </Border>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Style="{StaticResource SecondaryButton}" Content="丢弃选中的备份" Command="{Binding DiscardBackupCommand}"/>
+            <Button Content="恢复选中项" Command="{Binding RestoreBackupCommand}"/>
+            <Button Style="{StaticResource SecondaryButton}" Content="关闭" Click="Close_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

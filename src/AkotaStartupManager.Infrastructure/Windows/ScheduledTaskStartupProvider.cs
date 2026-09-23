@@ -53,6 +53,7 @@ public sealed class ScheduledTaskStartupProvider : IStartupProvider
             SourceType = SourceType,
             Name = taskName,
             OriginalLocation = item.Location,
+            RequiresElevation = item.RequiresElevation,
             WasEnabled = item.IsEnabled,
             Metadata = new Dictionary<string, string> { ["TaskPath"] = taskPath, ["TaskName"] = taskName }
         };

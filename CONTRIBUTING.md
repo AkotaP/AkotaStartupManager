@@ -65,7 +65,38 @@ test: cover retry cancellation
 
 ## 发布版本
 
-维护者手工发布流程：
+### 自动发布（推荐）
+
+推送带新版本号的提交后，GitHub Actions 会在远程完成构建与发布，不需要本地打包和手工上传。流程见 [`.github/workflows/release.yml`](.github/workflows/release.yml)。
+
+1. 更新根目录 `VERSION`，并在 `CHANGELOG.md` 中以 `## [版本号] - 发布日期` 的格式补上该版本小节（Release 说明会直接从这一节生成）。
+2. 提交并推送到 `main`。
+
+```powershell
+# 版本号是发布开关：推送的提交里 VERSION 指向哪个版本，就发布哪个版本
+git add VERSION CHANGELOG.md
+git commit -m "release: v0.2.1"
+git push origin main
+```
+
+工作流随后会：安装 .NET SDK → 执行 `scripts/publish.ps1`（含测试）→ 从 `CHANGELOG.md` 生成 Release 说明 → 建草稿 Release → 上传两个 ZIP 与两个 `.sha256` → 转为已发布。标签使用带注释的 `v<版本号>`，与手工流程一致。
+
+**同一个版本只会发布一次**：该标签已存在已发布的 Release 时，整个工作流直接跳过。因此日常提交不会误触发发布 —— 只有 `VERSION` 变更并推送的那一次会发布。
+
+其他触发方式：
+
+- 推送 `v*` 标签：`git tag -a v0.2.1 -m "Akota Startup Manager v0.2.1" && git push origin v0.2.1`
+- 在 Actions 页面手动运行 **Release** 工作流：可临时覆盖版本号（不修改 `VERSION`），或勾选 `force` 重新上传已发布版本的发行包。
+
+注意：
+
+- 工作流使用仓库自带的 `GITHUB_TOKEN`（`permissions: contents: write`），不需要个人访问令牌。若发布步骤报权限错误，请到 Settings → Actions → General → Workflow permissions 选择 “Read and write permissions”。
+- 发行包先上传到草稿 Release，全部成功后才转为已发布；中途失败不会留下残缺的 Release，重跑同一工作流即可复用该草稿。
+- 版本号含 `-`（如 `0.3.0-beta.1`）时自动标记为预发布，并不会被设为 latest。
+
+### 手工发布（备用）
+
+发布脚本仍可单独使用，用于本地验证产物：
 
 ```powershell
 # 在干净工作区执行；版本号自动读取仓库根目录 VERSION
@@ -73,9 +104,11 @@ test: cover retry cancellation
 
 # -Version 仅用于不修改 VERSION 的临时或预发布覆盖
 # .\scripts\publish.ps1 -Version 0.1.1-beta.1
+```
 
-# 检查 artifacts\ 下 standalone/runtime 两个 ZIP 及各自 SHA-256 后
-# 创建并推送与 VERSION 一致的标签，再上传四个文件
+检查 `artifacts\` 下 standalone/runtime 两个 ZIP 及各自 SHA-256 后，再创建并推送标签：
+
+```powershell
 $version = (Get-Content .\VERSION -Raw).Trim()
 git tag -a "v$version" -m "Akota Startup Manager v$version"
 git push origin "v$version"

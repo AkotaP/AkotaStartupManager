@@ -62,37 +62,51 @@ public sealed class RegistryStartupProvider : IStartupProvider
         var value = key.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames)
             ?? throw new InvalidOperationException("注册表启动项已被外部删除。");
         var kind = key.GetValueKind(valueName);
-        key.DeleteValue(valueName, throwOnMissingValue: true);
 
-        return Task.FromResult(new StartupBackupRecord
+        var backup = new StartupBackupRecord
         {
             StartupItemId = item.Id,
             SourceType = SourceType,
             Name = valueName,
             OriginalLocation = item.Location,
-            OriginalValue = value.ToString(),
-            OriginalRegistryValueKind = (int)kind,
+            RequiresElevation = location.Hive == RegistryHive.LocalMachine,
             WasEnabled = true
-        });
+        };
+
+        // 先把原始数据完整编码进备份记录。Capture 失败会在这里抛出，此时原值仍在注册表中，
+        // 不会出现“值已删除但备份不可用”的永久丢失。
+        RegistryValueSerialization.Capture(backup, value, kind);
+
+        key.DeleteValue(valueName, throwOnMissingValue: true);
+        return Task.FromResult(backup);
     }
 
     public Task RestoreAsync(StartupBackupRecord backup, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var value = RegistryValueSerialization.Decode(backup);
+        var kind = (RegistryValueKind)(backup.OriginalRegistryValueKind ?? (int)RegistryValueKind.String);
         var location = ParseLocation(backup.OriginalLocation);
         using var baseKey = RegistryKey.OpenBaseKey(location.Hive, location.View);
         using var key = baseKey.CreateSubKey(location.Path, writable: true);
         if (key.GetValue(backup.Name) is not null)
         {
-            throw new IOException($"注册表值“{backup.Name}”已经存在，未覆盖。 ");
+            throw new IOException($"注册表值“{backup.Name}”已经存在，未覆盖。");
         }
 
-        key.SetValue(backup.Name, backup.OriginalValue ?? string.Empty,
-            (RegistryValueKind)(backup.OriginalRegistryValueKind ?? (int)RegistryValueKind.String));
+        try
+        {
+            key.SetValue(backup.Name, value, kind);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidDataException($"备份“{backup.Name}”的数据与注册表类型 {kind} 不匹配，无法写回。", ex);
+        }
+
         return Task.CompletedTask;
     }
 
-    private static (RegistryHive Hive, RegistryView View, string Path) ParseLocation(string location)
+    internal static (RegistryHive Hive, RegistryView View, string Path) ParseLocation(string location)
     {
         var parts = location.Split('|', 3);
         if (parts.Length != 3 ||
